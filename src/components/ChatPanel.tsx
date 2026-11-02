@@ -21,8 +21,21 @@ function suggestionsFor(report: AnalysisReport): string[] {
 // Asistente conversacional bajo el informe. Cada pregunta envía la foto, el
 // informe y la conversación; el servidor no guarda nada, así que la
 // conversación solo existe mientras el informe está abierto.
-export function ChatPanel({ report, level, photo }: { report: AnalysisReport; level: UserLevel; photo: Blob }) {
-  const [messages, setMessages] = useState<ChatTurn[]>([]);
+export function ChatPanel({
+  report,
+  level,
+  photo,
+  initialMessages,
+  onMessagesChange,
+}: {
+  report: AnalysisReport;
+  level: UserLevel;
+  photo: Blob;
+  initialMessages: ChatTurn[];
+  // Se llama con cada respuesta completa, para guardar la conversación.
+  onMessagesChange: (messages: ChatTurn[]) => void;
+}) {
+  const [messages, setMessagesState] = useState<ChatTurn[]>(initialMessages);
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<{ message: string; retryable: boolean } | null>(null);
@@ -31,6 +44,12 @@ export function ChatPanel({ report, level, photo }: { report: AnalysisReport; le
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => () => abortRef.current?.abort(), []);
+
+  // Solo se guardan conversaciones que terminan con una respuesta del asistente.
+  const setMessages = (next: ChatTurn[]) => {
+    setMessagesState(next);
+    if (next.length === 0 || next[next.length - 1].role === "assistant") onMessagesChange(next);
+  };
 
   const busy = pending !== null;
   const atLimit = messages.length >= MAX_CHAT_MESSAGES - 1;

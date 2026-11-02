@@ -2,7 +2,7 @@
 
 Aplicación web que identifica componentes electrónicos y detecta posibles daños a partir de una fotografía.
 
-**Estado:** flujo principal funcional (captura → preparación → análisis con IA → informe) y asistente conversacional bajo el informe. Todavía no están implementados la búsqueda de documentación ni el historial, y la interfaz no los muestra.
+**Estado:** flujo principal funcional (captura → preparación → análisis con IA → informe), asistente conversacional bajo el informe e historial local. Todavía no está implementada la búsqueda de documentación, y la interfaz no la muestra.
 
 ## Estructura
 
@@ -11,8 +11,8 @@ src/app/             Aplicación Next.js
   page.tsx           Página principal
   api/analyze/       Endpoint de análisis (valida, limita el uso y transmite el progreso)
   api/chat/          Endpoint del asistente (valida la conversación y transmite la respuesta)
-src/components/      Pantallas: captura, preparación, espera, informe, visor de la foto y chat
-src/lib/             Utilidades de la interfaz (preparación de la foto, textos, límites)
+src/components/      Pantallas: captura, preparación, espera, informe, visor de la foto, chat e historial
+src/lib/             Utilidades de la interfaz (preparación de la foto, historial en IndexedDB, textos, límites)
 src/core/            Núcleo compartido por la aplicación y la evaluación
   report-schema.ts   Contrato del informe (esquema Zod → JSON Schema para la IA)
   prompt.ts          Instrucciones del análisis
@@ -133,5 +133,6 @@ Las métricas automáticas detectan los fallos más graves:
 - **La foto se envía sin metadatos.** La aplicación la reduce y la recodifica en el navegador, así que el EXIF y la ubicación GPS no salen del dispositivo; el servidor vuelve a validarla y tampoco la guarda.
 - **Estados de carga reales.** El endpoint responde con un evento por línea (NDJSON): la interfaz solo muestra «Analizando con IA» cuando el servidor ha validado la imagen y ha empezado el análisis.
 - **Cadena de modelos en la capa gratuita.** Gemini se satura a menudo. La aplicación prueba Gemini 3.6 Flash y, si está saturado o tarda más de 45 s, pasa a Gemini 3.8 Flash, con un máximo de 110 s en total. El informe indica qué modelo respondió. Flash-Lite se descartó porque en las pruebas leyó mal el modelo de una placa. Los reintentos automáticos del SDK de Google están desactivados porque multiplicaban las esperas y el consumo de cuota. La evaluación no usa la cadena, para no mezclar modelos.
-- **Asistente sin estado en el servidor.** Cada pregunta envía la foto ya reducida, el informe y la conversación (máximo 20 mensajes). El servidor no guarda nada, así que la conversación desaparece al empezar otro análisis; guardarla será parte del historial. La respuesta llega en streaming y, si un modelo está saturado antes de empezar a responder, pasa al siguiente de la cadena.
+- **Asistente sin estado en el servidor.** Cada pregunta envía la foto ya reducida, el informe y la conversación (máximo 20 mensajes). El servidor no guarda nada. La respuesta llega en streaming y, si un modelo está saturado antes de empezar a responder, pasa al siguiente de la cadena.
+- **Historial solo en el dispositivo.** Cada análisis se guarda en IndexedDB del navegador con la foto reducida (sin metadatos), el informe y la conversación, que se actualiza con cada respuesta. Se conservan los 50 más recientes y se pueden borrar uno a uno o todos. No hay cuentas ni copia en la nube: cambiar de navegador o borrar los datos del sitio vacía el historial. En ventanas privadas puede no estar disponible, y la app lo indica.
 - **Límite de uso.** 8 análisis y 30 preguntas cada 10 minutos por IP, en memoria. Con varias instancias en producción habrá que moverlo a un almacén compartido como Redis.

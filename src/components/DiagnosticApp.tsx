@@ -1,12 +1,15 @@
 "use client";
 
-import { RotateCcw } from "lucide-react";
+import { History, RotateCcw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { AnalysisReport } from "@/core/report-schema";
+import type { ChatTurn } from "@/core/chat-types";
+import type { AnalysisReport, UserLevel } from "@/core/report-schema";
 import type { AnalysisMeta, AnalyzeEvent, SafetyWarning } from "@/lib/api-types";
 import { ClientImageError, prepareForUpload } from "@/lib/client-image";
+import { saveAnalysis, updateConversation, type SavedAnalysis } from "@/lib/history";
 import { AnalyzingStep, type AnalyzingStage } from "./AnalyzingStep";
 import { CaptureStep } from "./CaptureStep";
+import { HistoryView } from "./HistoryView";
 import { PrepareStep, type AnalysisOptions } from "./PrepareStep";
 import { ReportView } from "./ReportView";
 import { Button } from "./ui";
@@ -19,13 +22,20 @@ type State =
   | { step: "analyzing"; photo: Photo; stage: AnalyzingStage }
   | {
       step: "report";
-      photo: Photo;
+      previewUrl: string;
       // Foto ya reducida y sin metadatos: el asistente la reutiliza en cada pregunta.
       upload: Blob;
       report: AnalysisReport;
       warnings: SafetyWarning[];
       meta: AnalysisMeta;
+      level: UserLevel;
+      createdAt: number;
+      historyId: string;
+      conversation: ChatTurn[];
+      // Si el navegador no permite guardar (p. ej. modo privado), se avisa en el informe.
+      saved: boolean;
     }
+  | { step: "history" }
   | { step: "error"; photo: Photo; message: string; retryable: boolean };
 
 const DEFAULT_OPTIONS: AnalysisOptions = { goal: "auto", level: "intermediate", context: "" };
@@ -72,6 +82,34 @@ export function DiagnosticApp({ testMode }: { testMode: boolean }) {
     setState({ step: "capture" });
   }, []);
 
+  const showSaved = (record: SavedAnalysis, previewUrl: string, saved = true) =>
+    setState({
+      step: "report",
+      previewUrl,
+      upload: record.photo,
+      report: record.report,
+      warnings: record.warnings,
+      meta: record.meta,
+      level: record.level,
+      createdAt: record.createdAt,
+      historyId: record.id,
+      conversation: record.conversation,
+      saved,
+    });
+
+  const openSaved = (record: SavedAnalysis) => {
+    abortRef.current?.abort();
+    const previewUrl = URL.createObjectURL(record.photo);
+    setPreview(previewUrl);
+    showSaved(record, previewUrl);
+  };
+
+  const openHistory = () => {
+    abortRef.current?.abort();
+    setPreview(null);
+    setState({ step: "history" });
+  };
+
   const analyze = async (photo: Photo, opts: AnalysisOptions) => {
     setOptions(opts);
     const controller = new AbortController();
@@ -110,14 +148,23 @@ export function DiagnosticApp({ testMode }: { testMode: boolean }) {
           if (event.type === "stage") setStage(event.stage);
           else if (event.type === "error") throw new AnalyzeError(event.message, event.retryable);
           else {
-            setState({
-              step: "report",
-              photo,
-              upload: blob,
+            const record: SavedAnalysis = {
+              id: crypto.randomUUID(),
+              createdAt: Date.now(),
+              photo: blob,
               report: event.report,
               warnings: event.warnings,
               meta: event.meta,
-            });
+              goal: opts.goal,
+              level: opts.level,
+              context: opts.context.trim(),
+              conversation: [],
+            };
+            const saved = await saveAnalysis(record).then(
+              () => true,
+              () => false,
+            );
+            showSaved(record, photo.previewUrl, saved);
             return;
           }
         }
@@ -149,11 +196,26 @@ export function DiagnosticApp({ testMode }: { testMode: boolean }) {
             <Mark />
             Electronics Diagnostic
           </button>
-          {testMode && (
-            <span className="rounded-full border border-border px-2.5 py-0.5 text-[12px] text-text-tertiary">
-              Modo de pruebas
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            {testMode && (
+              <span className="hidden rounded-full border border-border px-2.5 py-0.5 text-[12px] text-text-tertiary sm:inline">
+                Modo de pruebas
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={openHistory}
+              aria-current={state.step === "history" ? "page" : undefined}
+              className={`flex h-9 items-center gap-1.5 rounded-full px-3 text-[14px] font-medium transition-colors ${
+                state.step === "history"
+                  ? "bg-accent-soft text-accent"
+                  : "text-text-secondary hover:bg-surface-muted hover:text-text"
+              }`}
+            >
+              <History className="size-[17px]" strokeWidth={2} />
+              Historial
+            </button>
+          </div>
         </div>
       </header>
 
@@ -183,15 +245,24 @@ export function DiagnosticApp({ testMode }: { testMode: boolean }) {
 
         {state.step === "report" && (
           <ReportView
+            key={state.historyId}
             report={state.report}
             warnings={state.warnings}
             meta={state.meta}
-            previewUrl={state.photo.previewUrl}
+            previewUrl={state.previewUrl}
             upload={state.upload}
-            level={options.level}
+            level={state.level}
+            createdAt={state.createdAt}
+            saved={state.saved}
+            conversation={state.conversation}
+            onConversationChange={(conversation) => {
+              if (state.saved) updateConversation(state.historyId, conversation).catch(() => {});
+            }}
             onNewAnalysis={reset}
           />
         )}
+
+        {state.step === "history" && <HistoryView onOpen={openSaved} onNewAnalysis={reset} />}
 
         {state.step === "error" && (
           <section className="animate-enter mx-auto flex max-w-md flex-col items-center px-4 pt-20 text-center">

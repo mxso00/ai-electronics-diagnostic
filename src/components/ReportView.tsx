@@ -1,6 +1,7 @@
 "use client";
 
 import { AlertTriangle, Camera, Info, ShieldAlert, Wrench, Zap } from "lucide-react";
+import type { ChatTurn } from "@/core/chat-types";
 import type { AnalysisReport, UserLevel } from "@/core/report-schema";
 import type { AnalysisMeta, SafetyWarning } from "@/lib/api-types";
 import { CATEGORY_LABEL, CONFIDENCE_LABEL, DIFFICULTY_LABEL, STATUS } from "@/lib/labels";
@@ -22,6 +23,10 @@ export function ReportView({
   previewUrl,
   upload,
   level,
+  createdAt,
+  saved,
+  conversation,
+  onConversationChange,
   onNewAnalysis,
 }: {
   report: AnalysisReport;
@@ -30,6 +35,10 @@ export function ReportView({
   previewUrl: string;
   upload: Blob;
   level: UserLevel;
+  createdAt: number;
+  saved: boolean;
+  conversation: ChatTurn[];
+  onConversationChange: (conversation: ChatTurn[]) => void;
   onNewAnalysis: () => void;
 }) {
   const id = report.identification;
@@ -273,7 +282,13 @@ export function ReportView({
 
       {isElectronics && (
         <div className="mt-14">
-          <ChatPanel report={report} level={level} photo={upload} />
+          <ChatPanel
+            report={report}
+            level={level}
+            photo={upload}
+            initialMessages={conversation}
+            onMessagesChange={onConversationChange}
+          />
         </div>
       )}
 
@@ -283,7 +298,11 @@ export function ReportView({
           sea seguro o funcione.
         </p>
         <p className="mt-1">
-          Analizado con {meta.modelLabel} en {Math.round(meta.latencyMs / 1000)} s.
+          Analizado con {meta.modelLabel} en {Math.round(meta.latencyMs / 1000)} s ·{" "}
+          {new Date(createdAt).toLocaleString("es-ES", { dateStyle: "long", timeStyle: "short" })}.{" "}
+          {saved
+            ? "Guardado en el historial de este dispositivo."
+            : "Este navegador no permite guardarlo en el historial."}
         </p>
         <Button onClick={onNewAnalysis} className="mt-6">
           Nuevo análisis

@@ -39,11 +39,7 @@ export function jsonError(status: number, message: string, headers?: HeadersInit
 }
 
 export function rateLimitError(retryAfterSeconds: number, what: string) {
-  return jsonError(
-    429,
-    `Has hecho ${what}. Vuelve a intentarlo en ${Math.ceil(retryAfterSeconds / 60)} min.`,
-    {
-      "Retry-After": String(retryAfterSeconds),
-    },
-  );
+  return jsonError(429, `Has hecho ${what}. Vuelve a intentarlo en ${Math.ceil(retryAfterSeconds / 60)} min.`, {
+    "Retry-After": String(retryAfterSeconds),
+  });
 }
