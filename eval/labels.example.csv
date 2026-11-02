@@ -1,0 +1,6 @@
+file,category,manufacturer,model,damage,context,notes
+placa-asus.jpg,motherboard,ASUS,ROG STRIX B550-F GAMING,no,,Modelo serigrafiado junto al zócalo
+condensadores-hinchados.jpg,motherboard,-,-,yes,El PC no arranca,Dos condensadores abombados junto al VRM
+fuente-abierta.jpg,power_supply,Corsair,-,unknown,,Etiqueta no visible
+smd-borroso.jpg,integrated_circuit,-,-,unknown,,Foto desenfocada a propósito
+taza.jpg,not_electronic,-,-,unknown,,Control: no es electrónica

@@ -1,0 +1,147 @@
+@import "tailwindcss";
+
+/*
+ * Identidad visual: superficies claras, tipografía casi negra, un único acento
+ * cobalto. El rojo y el ámbar se reservan para seguridad y daños.
+ * Todos los colores salen de estos tokens; el modo oscuro solo los redefine.
+ */
+:root {
+  --bg: #f5f5f7;
+  --surface: #ffffff;
+  --surface-muted: #fafafa;
+  --text: #1d1d1f;
+  --text-secondary: #6e6e73;
+  --text-tertiary: #86868b;
+  --border: rgb(0 0 0 / 0.08);
+  --border-strong: rgb(0 0 0 / 0.14);
+  --accent: #2f5bea;
+  --accent-hover: #2449c4;
+  --accent-soft: rgb(47 91 234 / 0.08);
+  --danger: #c4302b;
+  --danger-soft: rgb(196 48 43 / 0.07);
+  --warning: #a35a00;
+  --warning-soft: rgb(214 130 0 / 0.1);
+  --success: #1b7f3b;
+  --success-soft: rgb(27 127 59 / 0.08);
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px rgb(0 0 0 / 0.04);
+  --shadow-float: 0 2px 6px rgb(0 0 0 / 0.06), 0 24px 60px rgb(0 0 0 / 0.1);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b0b0c;
+    --surface: #161618;
+    --surface-muted: #1c1c1f;
+    --text: #f5f5f7;
+    --text-secondary: #a1a1a6;
+    --text-tertiary: #7c7c82;
+    --border: rgb(255 255 255 / 0.09);
+    --border-strong: rgb(255 255 255 / 0.16);
+    --accent: #5b82ff;
+    --accent-hover: #7a99ff;
+    --accent-soft: rgb(91 130 255 / 0.14);
+    --danger: #ff6b63;
+    --danger-soft: rgb(255 107 99 / 0.12);
+    --warning: #f0a33a;
+    --warning-soft: rgb(240 163 58 / 0.12);
+    --success: #4cc27a;
+    --success-soft: rgb(76 194 122 / 0.12);
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-float: 0 24px 60px rgb(0 0 0 / 0.5);
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-text: var(--text);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --shadow-card: var(--shadow-card);
+  --shadow-float: var(--shadow-float);
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", system-ui, sans-serif;
+  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Segoe UI", system-ui, sans-serif;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--accent-soft);
+}
+
+/* Entrada suave de cada paso del flujo. */
+@keyframes enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Barra de progreso indeterminada: no inventa un porcentaje que no conocemos. */
+@keyframes indeterminate {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(250%);
+  }
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+.animate-enter {
+  animation: enter 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.animate-indeterminate {
+  animation: indeterminate 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.animate-breathe {
+  animation: breathe 2.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-enter,
+  .animate-indeterminate,
+  .animate-breathe {
+    animation: none;
+  }
+}

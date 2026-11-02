@@ -1,0 +1,10 @@
+node_modules/
+.env
+eval/images/*
+!eval/images/.gitkeep
+eval/results/
+
+.next/
+next-env.d.ts
+*.tsbuildinfo
+.DS_Store
