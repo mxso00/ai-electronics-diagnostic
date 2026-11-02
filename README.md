@@ -2,7 +2,7 @@
 
 Aplicación web que identifica componentes electrónicos y detecta posibles daños a partir de una fotografía.
 
-**Estado:** flujo principal funcional (captura → preparación → análisis con IA → informe), asistente conversacional bajo el informe e historial local. Todavía no está implementada la búsqueda de documentación, y la interfaz no la muestra.
+**Estado:** MVP completo: flujo principal (captura → preparación → análisis con IA → informe), documentación técnica con enlaces comprobados, asistente conversacional e historial local.
 
 ## Estructura
 
@@ -11,13 +11,15 @@ src/app/             Aplicación Next.js
   page.tsx           Página principal
   api/analyze/       Endpoint de análisis (valida, limita el uso y transmite el progreso)
   api/chat/          Endpoint del asistente (valida la conversación y transmite la respuesta)
-src/components/      Pantallas: captura, preparación, espera, informe, visor de la foto, chat e historial
+  api/docs/          Endpoint de documentación técnica
+src/components/      Pantallas: captura, preparación, espera, informe, documentación, visor de la foto, chat e historial
 src/lib/             Utilidades de la interfaz (preparación de la foto, historial en IndexedDB, textos, límites)
 src/core/            Núcleo compartido por la aplicación y la evaluación
   report-schema.ts   Contrato del informe (esquema Zod → JSON Schema para la IA)
   prompt.ts          Instrucciones del análisis
   chat-prompt.ts     Instrucciones del asistente (incluye el informe como datos)
   chat.ts            Punto único de entrada al chat
+  docs/              Búsqueda de documentación (Tavily), dominios oficiales y comprobación segura de enlaces
   analyze.ts         Punto único de entrada al análisis; elige el proveedor según el modelo
   providers/         Un archivo por proveedor de IA (Anthropic, Google Gemini)
   image.ts           Validación, orientación, redimensionado y eliminación de EXIF/GPS
@@ -32,6 +34,8 @@ eval/                Fotos, etiquetas y resultados de la evaluación (no se sube
 Necesitas Node.js 20.9 o superior y una clave de API de al menos uno de estos proveedores:
 - **Google Gemini** (`GEMINI_API_KEY`), con capa gratuita: [aistudio.google.com/apikey](https://aistudio.google.com/apikey). En la capa gratuita, Google puede usar lo que envías para mejorar sus productos, y la aplicación lo indica como «Modo de pruebas». Sirve para probar, nunca para fotos de usuarios. Sus límites de uso son bajos y cambian a menudo.
 - **Anthropic** (`ANTHROPIC_API_KEY`), de pago y prepago: [platform.claude.com](https://platform.claude.com).
+
+Para la documentación técnica hace falta además una clave de **Tavily** (`TAVILY_API_KEY`), un buscador para aplicaciones con IA. El plan gratuito incluye 1.000 búsquedas al mes y no pide tarjeta: [app.tavily.com](https://app.tavily.com). Sin esta clave, la app funciona igual y la sección de documentación indica que no está configurada.
 
 ```bash
 npm install
@@ -135,4 +139,5 @@ Las métricas automáticas detectan los fallos más graves:
 - **Cadena de modelos en la capa gratuita.** Gemini se satura a menudo. La aplicación prueba Gemini 3.6 Flash y, si está saturado o tarda más de 45 s, pasa a Gemini 3.8 Flash, con un máximo de 110 s en total. El informe indica qué modelo respondió. Flash-Lite se descartó porque en las pruebas leyó mal el modelo de una placa. Los reintentos automáticos del SDK de Google están desactivados porque multiplicaban las esperas y el consumo de cuota. La evaluación no usa la cadena, para no mezclar modelos.
 - **Asistente sin estado en el servidor.** Cada pregunta envía la foto ya reducida, el informe y la conversación (máximo 20 mensajes). El servidor no guarda nada. La respuesta llega en streaming y, si un modelo está saturado antes de empezar a responder, pasa al siguiente de la cadena.
 - **Historial solo en el dispositivo.** Cada análisis se guarda en IndexedDB del navegador con la foto reducida (sin metadatos), el informe y la conversación, que se actualiza con cada respuesta. Se conservan los 50 más recientes y se pueden borrar uno a uno o todos. No hay cuentas ni copia en la nube: cambiar de navegador o borrar los datos del sitio vacía el historial. En ventanas privadas puede no estar disponible, y la app lo indica.
-- **Límite de uso.** 8 análisis y 30 preguntas cada 10 minutos por IP, en memoria. Con varias instancias en producción habrá que moverlo a un almacén compartido como Redis.
+- **Documentación sin enlaces inventados.** La búsqueda de Google de Gemini no está disponible en su capa gratuita, así que se usa Tavily. Solo se busca si el modelo exacto está identificado con confianza alta. Primero se busca en los dominios oficiales del fabricante (`src/core/docs/official-domains.ts`) y, si no hay nada, en el resto de la web. Un enlace se muestra solo si menciona el modelo exacto (fuera de la web oficial, en el título o la dirección) y si el servidor comprueba que responde. Esa comprobación solo admite https e IPs públicas, también en cada redirección, para evitar SSRF. Los resultados se guardan 24 h en memoria y en el historial, para no gastar búsquedas.
+- **Límite de uso.** 8 análisis, 30 preguntas y 10 búsquedas de documentación cada 10 minutos por IP, en memoria. Con varias instancias en producción habrá que moverlo a un almacén compartido como Redis.

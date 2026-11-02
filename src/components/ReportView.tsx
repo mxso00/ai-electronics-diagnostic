@@ -2,10 +2,12 @@
 
 import { AlertTriangle, Camera, Info, ShieldAlert, Wrench, Zap } from "lucide-react";
 import type { ChatTurn } from "@/core/chat-types";
+import type { DocsResult } from "@/core/docs/types";
 import type { AnalysisReport, UserLevel } from "@/core/report-schema";
 import type { AnalysisMeta, SafetyWarning } from "@/lib/api-types";
 import { CATEGORY_LABEL, CONFIDENCE_LABEL, DIFFICULTY_LABEL, STATUS } from "@/lib/labels";
 import { ChatPanel } from "./ChatPanel";
+import { DocsSection } from "./DocsSection";
 import { ImageViewer } from "./ImageViewer";
 import { Button, Card, Pill, SectionTitle, type Tone } from "./ui";
 
@@ -26,7 +28,10 @@ export function ReportView({
   createdAt,
   saved,
   conversation,
+  docs,
+  autoSearchDocs,
   onConversationChange,
+  onDocsChange,
   onNewAnalysis,
 }: {
   report: AnalysisReport;
@@ -38,7 +43,10 @@ export function ReportView({
   createdAt: number;
   saved: boolean;
   conversation: ChatTurn[];
+  docs?: DocsResult;
+  autoSearchDocs: boolean;
   onConversationChange: (conversation: ChatTurn[]) => void;
+  onDocsChange: (docs: DocsResult) => void;
   onNewAnalysis: () => void;
 }) {
   const id = report.identification;
@@ -259,6 +267,8 @@ export function ReportView({
             </p>
           </section>
         )}
+
+        <DocsSection report={report} initialDocs={docs} autoSearch={autoSearchDocs} onDocsChange={onDocsChange} />
 
         {report.follow_up.length > 0 && (
           <section>

@@ -3,10 +3,11 @@
 import { History, RotateCcw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChatTurn } from "@/core/chat-types";
+import type { DocsResult } from "@/core/docs/types";
 import type { AnalysisReport, UserLevel } from "@/core/report-schema";
 import type { AnalysisMeta, AnalyzeEvent, SafetyWarning } from "@/lib/api-types";
 import { ClientImageError, prepareForUpload } from "@/lib/client-image";
-import { saveAnalysis, updateConversation, type SavedAnalysis } from "@/lib/history";
+import { saveAnalysis, updateAnalysis, type SavedAnalysis } from "@/lib/history";
 import { AnalyzingStep, type AnalyzingStage } from "./AnalyzingStep";
 import { CaptureStep } from "./CaptureStep";
 import { HistoryView } from "./HistoryView";
@@ -32,6 +33,9 @@ type State =
       createdAt: number;
       historyId: string;
       conversation: ChatTurn[];
+      docs?: DocsResult;
+      // true si viene de un análisis recién hecho (no del historial).
+      fresh: boolean;
       // Si el navegador no permite guardar (p. ej. modo privado), se avisa en el informe.
       saved: boolean;
     }
@@ -82,7 +86,7 @@ export function DiagnosticApp({ testMode }: { testMode: boolean }) {
     setState({ step: "capture" });
   }, []);
 
-  const showSaved = (record: SavedAnalysis, previewUrl: string, saved = true) =>
+  const showSaved = (record: SavedAnalysis, previewUrl: string, saved = true, fresh = false) =>
     setState({
       step: "report",
       previewUrl,
@@ -94,6 +98,8 @@ export function DiagnosticApp({ testMode }: { testMode: boolean }) {
       createdAt: record.createdAt,
       historyId: record.id,
       conversation: record.conversation,
+      docs: record.docs,
+      fresh,
       saved,
     });
 
@@ -164,7 +170,7 @@ export function DiagnosticApp({ testMode }: { testMode: boolean }) {
               () => true,
               () => false,
             );
-            showSaved(record, photo.previewUrl, saved);
+            showSaved(record, photo.previewUrl, saved, true);
             return;
           }
         }
@@ -255,8 +261,13 @@ export function DiagnosticApp({ testMode }: { testMode: boolean }) {
             createdAt={state.createdAt}
             saved={state.saved}
             conversation={state.conversation}
+            docs={state.docs}
+            autoSearchDocs={state.fresh}
             onConversationChange={(conversation) => {
-              if (state.saved) updateConversation(state.historyId, conversation).catch(() => {});
+              if (state.saved) updateAnalysis(state.historyId, { conversation }).catch(() => {});
+            }}
+            onDocsChange={(docs) => {
+              if (state.saved) updateAnalysis(state.historyId, { docs }).catch(() => {});
             }}
             onNewAnalysis={reset}
           />

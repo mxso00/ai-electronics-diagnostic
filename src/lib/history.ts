@@ -1,4 +1,5 @@
 import type { ChatTurn } from "@/core/chat-types";
+import type { DocsResult } from "@/core/docs/types";
 import type { AnalysisGoal, AnalysisReport, UserLevel } from "@/core/report-schema";
 import type { AnalysisMeta, SafetyWarning } from "./api-types";
 
@@ -18,6 +19,8 @@ export interface SavedAnalysis {
   level: UserLevel;
   context: string;
   conversation: ChatTurn[];
+  // Documentación encontrada para el modelo (si se buscó).
+  docs?: DocsResult;
 }
 
 const DB_NAME = "electronics-diagnostic";
@@ -77,9 +80,12 @@ export async function saveAnalysis(analysis: SavedAnalysis): Promise<void> {
   if (excess.length) await run("readwrite", (store) => excess.forEach((a) => store.delete(a.id)));
 }
 
-export async function updateConversation(id: string, conversation: ChatTurn[]): Promise<void> {
+export async function updateAnalysis(
+  id: string,
+  patch: Partial<Pick<SavedAnalysis, "conversation" | "docs">>,
+): Promise<void> {
   const current = await getAnalysis(id);
-  if (current) await run("readwrite", (store) => store.put({ ...current, conversation }));
+  if (current) await run("readwrite", (store) => store.put({ ...current, ...patch }));
 }
 
 export function deleteAnalysis(id: string): Promise<void> {

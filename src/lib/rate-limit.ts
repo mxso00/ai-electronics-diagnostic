@@ -5,7 +5,7 @@
 const WINDOW_MS = 10 * 60 * 1000;
 
 // Peticiones permitidas por ventana de 10 minutos para cada tipo de petición.
-const LIMITS = { analyze: 8, chat: 30 } as const;
+const LIMITS = { analyze: 8, chat: 30, docs: 10 } as const;
 
 const hits = new Map<string, number[]>();
 
