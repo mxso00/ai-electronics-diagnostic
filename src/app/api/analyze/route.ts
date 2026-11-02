@@ -1,12 +1,13 @@
 import * as z from "zod/v4";
-import { analyzeImage, type AnalyzeErrorCode } from "@/core/analyze";
+import { analyzeImage } from "@/core/analyze";
 import { ImageError, prepareImage } from "@/core/image";
 import { API_KEY_ENV, MODELS } from "@/core/models";
 import { AnalysisGoal, UserLevel } from "@/core/report-schema";
 import { safetyWarnings } from "@/core/safety";
+import { jsonError, rateLimitError, userFacingError } from "@/lib/api-errors";
 import { MAX_CONTEXT_CHARS, MAX_UPLOAD_BYTES, type AnalyzeEvent } from "@/lib/api-types";
 import { activeModel } from "@/lib/config";
-import { checkRateLimit } from "@/lib/rate-limit";
+import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 
 // Un análisis puede tardar más de un minuto.
 export const maxDuration = 120;
@@ -17,29 +18,6 @@ const Fields = z.object({
   context: z.string().max(MAX_CONTEXT_CHARS).optional(),
 });
 
-// Mensajes para el usuario. Los detalles técnicos se quedan en el registro
-// del servidor.
-const ERROR_MESSAGES: Record<AnalyzeErrorCode, { message: string; retryable: boolean }> = {
-  refusal: { message: "El servicio de IA no ha podido analizar esta imagen. Prueba con otra foto.", retryable: false },
-  truncated: { message: "El análisis ha quedado incompleto. Vuelve a intentarlo.", retryable: true },
-  invalid_output: { message: "El análisis no se ha generado correctamente. Vuelve a intentarlo.", retryable: true },
-  rate_limited: {
-    message: "El servicio de IA está saturado en este momento. Espera un minuto y vuelve a intentarlo.",
-    retryable: true,
-  },
-  auth: { message: "El servicio de IA no está configurado correctamente.", retryable: false },
-  bad_request: { message: "El servicio de IA ha rechazado la petición.", retryable: false },
-  service_unavailable: {
-    message: "El servicio de IA no está disponible ahora mismo. Inténtalo en unos minutos.",
-    retryable: true,
-  },
-  network: { message: "No hemos podido conectar con el servicio de IA. Inténtalo de nuevo.", retryable: true },
-};
-
-function jsonError(status: number, message: string, headers?: HeadersInit) {
-  return Response.json({ error: message }, { status, headers });
-}
-
 export async function POST(request: Request) {
   const model = activeModel();
   if (!process.env[API_KEY_ENV[MODELS[model].provider]]) {
@@ -47,17 +25,8 @@ export async function POST(request: Request) {
     return jsonError(503, "El servicio de análisis no está configurado.");
   }
 
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
-  const limit = checkRateLimit(ip);
-  if (!limit.allowed) {
-    return jsonError(
-      429,
-      `Has hecho muchos análisis seguidos. Vuelve a intentarlo en ${Math.ceil(limit.retryAfterSeconds / 60)} min.`,
-      {
-        "Retry-After": String(limit.retryAfterSeconds),
-      },
-    );
-  }
+  const limit = checkRateLimit("analyze", clientIp(request));
+  if (!limit.allowed) return rateLimitError(limit.retryAfterSeconds, "muchos análisis seguidos");
 
   let form: FormData;
   try {
@@ -103,7 +72,7 @@ export async function POST(request: Request) {
         });
       } else {
         console.error(`Análisis fallido (${result.error}): ${result.message}`);
-        send({ type: "error", ...ERROR_MESSAGES[result.error] });
+        send({ type: "error", ...userFacingError(result.error, "analysis") });
       }
       controller.close();
     },

@@ -1,6 +1,8 @@
 import { GoogleGenAI } from "@google/genai";
 import * as z from "zod/v4";
 import type { AnalyzeErrorCode, AnalyzeInput, AnalyzeResult, AnalyzeUsage, Effort } from "../analyze";
+import { buildChatSystemPrompt } from "../chat-prompt";
+import { ChatError, type ChatInput } from "../chat-types";
 import { estimateCostUsd, MODELS } from "../models";
 import { buildUserText, SYSTEM_PROMPT } from "../prompt";
 import { AnalysisReport } from "../report-schema";
@@ -75,7 +77,7 @@ export async function analyzeWithGemini(input: AnalyzeInput): Promise<AnalyzeRes
       console.warn(
         `Gemini ${candidate}: fallo tras ${Math.round(elapsed())} ms (${classified.error}): ${classified.message}`,
       );
-      const retryable = classified.error === "rate_limited" || classified.error === "service_unavailable";
+      const retryable = ["rate_limited", "service_unavailable", "network"].includes(classified.error);
       const isLast = index === attempts.length - 1;
       const sameModelNext = attempts[index + 1] === candidate;
       const delay = sameModelNext ? SAME_MODEL_RETRY_DELAY_MS : 0;
@@ -168,4 +170,65 @@ function errorReason(error: unknown) {
 
 function errorMessage(error: unknown) {
   return parseErrorBody(error)?.message ?? (error instanceof Error ? error.message : String(error));
+}
+
+// Chat sobre un análisis. Si el modelo falla por saturación antes de empezar a
+// responder, pasamos al siguiente de la cadena; una vez empezada la respuesta
+// no se cambia de modelo.
+export async function* streamChatWithGemini(input: ChatInput): AsyncGenerator<string, { modelLabel: string }> {
+  client ??= new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  const started = performance.now();
+  const primary: string = MODELS[input.model].id;
+  const candidates = input.fallback ? [primary, ...FALLBACK_CHAIN.filter((id) => id !== primary)] : [primary];
+
+  const steps = input.messages.map((turn, index) => {
+    const content: ({ type: "text"; text: string } | { type: "image"; data: string; mime_type: "image/jpeg" })[] = [
+      { type: "text", text: turn.text },
+    ];
+    // La foto va en el primer mensaje del usuario.
+    if (index === 0) content.unshift({ type: "image", data: input.image.base64, mime_type: input.image.mediaType });
+    return turn.role === "user" ? { type: "user_input" as const, content } : { type: "model_output" as const, content };
+  });
+
+  for (const [index, candidate] of candidates.entries()) {
+    let startedOutput = false;
+    try {
+      const stream = await client.interactions.create(
+        {
+          model: candidate,
+          system_instruction: buildChatSystemPrompt(input.report, input.level),
+          input: steps,
+          generation_config: { thinking_level: "low", max_output_tokens: 4000 },
+          store: false,
+          stream: true,
+        },
+        {
+          retries: { strategy: "none" },
+          timeout_ms: Math.round(Math.min(ATTEMPT_TIMEOUT_MS, DEADLINE_MS - (performance.now() - started))),
+        },
+      );
+      for await (const event of stream) {
+        if (event.event_type === "step.delta" && event.delta.type === "text" && event.delta.text) {
+          startedOutput = true;
+          yield event.delta.text;
+        } else if (event.event_type === "error") {
+          throw new ChatError("service_unavailable", event.error?.message ?? "Error durante la respuesta.");
+        }
+      }
+      if (!startedOutput) throw new ChatError("refusal", "El modelo no ha devuelto ninguna respuesta.");
+      return { modelLabel: LABELS[candidate] ?? candidate };
+    } catch (error) {
+      const chatError = error instanceof ChatError ? error : toChatError(error);
+      console.warn(`Gemini chat ${candidate}: ${chatError.code}: ${chatError.message}`);
+      const retryable = ["rate_limited", "service_unavailable", "network"].includes(chatError.code);
+      const timeLeft = DEADLINE_MS - (performance.now() - started);
+      if (startedOutput || !retryable || index === candidates.length - 1 || timeLeft < MIN_ATTEMPT_MS) throw chatError;
+    }
+  }
+  throw new ChatError("service_unavailable", "Gemini no está disponible.");
+}
+
+function toChatError(error: unknown) {
+  const { error: code, message } = classifyError(error);
+  return new ChatError(code, message);
 }

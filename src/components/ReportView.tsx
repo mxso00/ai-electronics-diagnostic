@@ -1,9 +1,10 @@
 "use client";
 
 import { AlertTriangle, Camera, Info, ShieldAlert, Wrench, Zap } from "lucide-react";
-import type { AnalysisReport } from "@/core/report-schema";
+import type { AnalysisReport, UserLevel } from "@/core/report-schema";
 import type { AnalysisMeta, SafetyWarning } from "@/lib/api-types";
 import { CATEGORY_LABEL, CONFIDENCE_LABEL, DIFFICULTY_LABEL, STATUS } from "@/lib/labels";
+import { ChatPanel } from "./ChatPanel";
 import { ImageViewer } from "./ImageViewer";
 import { Button, Card, Pill, SectionTitle, type Tone } from "./ui";
 
@@ -19,12 +20,16 @@ export function ReportView({
   warnings,
   meta,
   previewUrl,
+  upload,
+  level,
   onNewAnalysis,
 }: {
   report: AnalysisReport;
   warnings: SafetyWarning[];
   meta: AnalysisMeta;
   previewUrl: string;
+  upload: Blob;
+  level: UserLevel;
   onNewAnalysis: () => void;
 }) {
   const id = report.identification;
@@ -265,6 +270,12 @@ export function ReportView({
           </section>
         )}
       </div>
+
+      {isElectronics && (
+        <div className="mt-14">
+          <ChatPanel report={report} level={level} photo={upload} />
+        </div>
+      )}
 
       <footer className="mt-16 border-t border-border pt-6 text-[13px] leading-relaxed text-text-tertiary">
         <p>

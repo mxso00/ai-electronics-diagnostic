@@ -17,7 +17,15 @@ type State =
   | { step: "capture"; error?: string }
   | { step: "prepare"; photo: Photo }
   | { step: "analyzing"; photo: Photo; stage: AnalyzingStage }
-  | { step: "report"; photo: Photo; report: AnalysisReport; warnings: SafetyWarning[]; meta: AnalysisMeta }
+  | {
+      step: "report";
+      photo: Photo;
+      // Foto ya reducida y sin metadatos: el asistente la reutiliza en cada pregunta.
+      upload: Blob;
+      report: AnalysisReport;
+      warnings: SafetyWarning[];
+      meta: AnalysisMeta;
+    }
   | { step: "error"; photo: Photo; message: string; retryable: boolean };
 
 const DEFAULT_OPTIONS: AnalysisOptions = { goal: "auto", level: "intermediate", context: "" };
@@ -102,7 +110,14 @@ export function DiagnosticApp({ testMode }: { testMode: boolean }) {
           if (event.type === "stage") setStage(event.stage);
           else if (event.type === "error") throw new AnalyzeError(event.message, event.retryable);
           else {
-            setState({ step: "report", photo, report: event.report, warnings: event.warnings, meta: event.meta });
+            setState({
+              step: "report",
+              photo,
+              upload: blob,
+              report: event.report,
+              warnings: event.warnings,
+              meta: event.meta,
+            });
             return;
           }
         }
@@ -172,6 +187,8 @@ export function DiagnosticApp({ testMode }: { testMode: boolean }) {
             warnings={state.warnings}
             meta={state.meta}
             previewUrl={state.photo.previewUrl}
+            upload={state.upload}
+            level={options.level}
             onNewAnalysis={reset}
           />
         )}

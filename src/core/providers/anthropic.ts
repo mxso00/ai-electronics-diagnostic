@@ -1,6 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import type { AnalyzeErrorCode, AnalyzeInput, AnalyzeResult, AnalyzeUsage } from "../analyze";
+import { buildChatSystemPrompt } from "../chat-prompt";
+import { ChatError, type ChatInput } from "../chat-types";
 import { estimateCostUsd, MODELS } from "../models";
 import { buildUserText, SYSTEM_PROMPT } from "../prompt";
 import { AnalysisReport } from "../report-schema";
@@ -70,4 +72,45 @@ function classifyError(error: unknown): { error: AnalyzeErrorCode; message: stri
   }
   // Errores de validación del SDK al parsear la salida estructurada.
   return { error: "invalid_output", message: error instanceof Error ? error.message : String(error) };
+}
+
+// Chat sobre un análisis, con la respuesta en streaming.
+export async function* streamChatWithAnthropic(input: ChatInput): AsyncGenerator<string, { modelLabel: string }> {
+  client ??= new Anthropic({ maxRetries: 3, timeout: 5 * 60 * 1000 });
+  const messages: Anthropic.MessageParam[] = input.messages.map((turn, index) => ({
+    role: turn.role,
+    content:
+      index === 0
+        ? [
+            { type: "image", source: { type: "base64", media_type: input.image.mediaType, data: input.image.base64 } },
+            { type: "text", text: turn.text },
+          ]
+        : turn.text,
+  }));
+
+  let wrote = false;
+  try {
+    const stream = client.messages.stream({
+      model: MODELS[input.model].id,
+      max_tokens: 4000,
+      thinking: { type: "adaptive" },
+      output_config: { effort: "low" },
+      system: buildChatSystemPrompt(input.report, input.level),
+      messages,
+    });
+    for await (const event of stream) {
+      if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+        wrote = true;
+        yield event.delta.text;
+      }
+    }
+    const final = await stream.finalMessage();
+    if (final.stop_reason === "refusal") throw new ChatError("refusal", "El modelo ha rechazado la pregunta.");
+    if (!wrote) throw new ChatError("refusal", "El modelo no ha devuelto ninguna respuesta.");
+    return { modelLabel: MODELS[input.model].label };
+  } catch (error) {
+    if (error instanceof ChatError) throw error;
+    const { error: code, message } = classifyError(error);
+    throw new ChatError(code, message);
+  }
 }
