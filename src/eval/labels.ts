@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { relative } from "node:path";
 import * as z from "zod/v4";
 import { ComponentCategory } from "../core/report-schema";
 
@@ -18,14 +19,19 @@ export type Label = z.infer<typeof Label>;
 
 const COLUMNS = ["file", "category", "manufacturer", "model", "damage", "notes"] as const;
 
+// Valor que pone «npm run eval:prepare» en las filas nuevas, para que no se
+// evalúen hasta que alguien escriba la categoría correcta.
+export const PENDING_CATEGORY = "REVISAR";
+
 export async function loadLabels(path: string): Promise<Label[]> {
+  const shown = relative(process.cwd(), path) || path;
   const text = (await readFile(path, "utf8")).replace(/^\uFEFF/, "");
   const rows = parseCsv(text).filter((row) => row.some((cell) => cell.trim() !== ""));
-  if (rows.length === 0) throw new Error(`${path} está vacío.`);
+  if (rows.length === 0) throw new Error(`${shown} está vacío.`);
 
   const header = rows[0].map((h) => h.trim().toLowerCase());
   const missing = COLUMNS.filter((c) => !header.includes(c));
-  if (missing.length) throw new Error(`Faltan columnas en ${path}: ${missing.join(", ")}`);
+  if (missing.length) throw new Error(`Faltan columnas en ${shown}: ${missing.join(", ")}`);
 
   const problems: string[] = [];
   const labels: Label[] = [];
@@ -45,12 +51,20 @@ export async function loadLabels(path: string): Promise<Label[]> {
       context: get("context"),
     });
     if (parsed.success) labels.push(parsed.data);
-    else
-      problems.push(
-        `línea ${i + 2}: ${parsed.error.issues.map((e) => `${e.path.join(".")}: ${e.message}`).join("; ")}`,
+    else {
+      const fields = parsed.error.issues.map((e) => String(e.path[0]));
+      const name = get("file") ?? "(sin nombre)";
+      const reasons = fields.map((field) =>
+        field === "category"
+          ? `categoría «${get("category")}» no válida (usa una de la lista de eval/GUIA.md)`
+          : field === "damage"
+            ? `damage «${get("damage")}» no válido (yes, no o unknown)`
+            : `${field} no válido`,
       );
+      problems.push(`línea ${i + 2} (${name}): ${reasons.join("; ")}`);
+    }
   });
-  if (problems.length) throw new Error(`Errores en ${path}:\n  ${problems.join("\n  ")}`);
+  if (problems.length) throw new Error(`Errores en ${shown}:\n  ${problems.join("\n  ")}`);
   return labels;
 }
 

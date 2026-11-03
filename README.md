@@ -61,13 +61,12 @@ Otros comandos: `npm run build` (compilación de producción), `npm run typechec
 
 Pasa tus fotos etiquetadas por uno o varios modelos, genera el mismo informe que la aplicación y lo compara con la respuesta correcta.
 
+**Para hacer la validación con tus fotos, sigue [eval/GUIA.md](eval/GUIA.md)**: qué fotografiar, cómo etiquetar y cómo continuar otro día si se agota la cuota.
+
 ### Preparar las fotos
 
-1. Copia tus fotos en `eval/images/`. Se admiten JPEG, PNG y WebP. Las fotos HEIC del iPhone hay que convertirlas a JPEG; en Mac:
-   ```bash
-   sips -s format jpeg foto.heic --out foto.jpg
-   ```
-2. Copia `eval/labels.example.csv` como `eval/labels.csv` y escribe una fila por foto. Puedes editarlo con Excel; acepta coma o punto y coma como separador.
+1. Copia tus fotos en `eval/images/`. Se admiten JPEG, PNG, WebP y HEIC (las HEIC se convierten en el paso siguiente, solo en macOS).
+2. Ejecuta `npm run eval:prepare`: convierte las fotos HEIC a JPEG y añade a `eval/labels.csv` una fila por cada foto nueva con la categoría `REVISAR`. Después completa cada fila. Puedes editarlo con Excel; acepta coma o punto y coma como separador.
 
 | Columna | Qué poner |
 |---|---|
@@ -102,19 +101,19 @@ Prueba con pocas fotos antes de lanzar todo:
 npm run eval -- --limit 3
 ```
 
-La ejecución completa compara Opus 5.5 y Sonnet 5.5 con esfuerzo `high`:
+La ejecución completa usa Opus 5.5 y Sonnet 5.5 si hay clave de Anthropic, y Gemini 3.6 Flash si solo hay clave de Gemini, con esfuerzo `high`:
 
 ```bash
 npm run eval
 ```
 
-Solo con la capa gratuita de Gemini:
+Para continuar una evaluación que se cortó (por ejemplo, porque se agotó la cuota diaria de Gemini), repitiendo solo lo que falló o faltaba:
 
 ```bash
-npm run eval -- --models gemini
+npm run eval -- --resume
 ```
 
-Otras opciones: `--models opus,sonnet,haiku,gemini`, `--effort medium`, `--max-edge 1568`, `--goal damage`, `--level beginner`, `--only foto.jpg`. Usa `npm run eval -- --help` para verlas todas.
+Otras opciones: `--models opus,sonnet,haiku,gemini,gemini38`, `--effort medium`, `--max-edge 1568`, `--goal damage`, `--level beginner`, `--only foto.jpg`. Usa `npm run eval -- --help` para verlas todas.
 
 ### Leer los resultados
 

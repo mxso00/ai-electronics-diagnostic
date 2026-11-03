@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "eval": "tsx src/eval/run.ts"
+    "eval": "tsx src/eval/run.ts",
+    "eval:prepare": "tsx src/eval/prepare.ts"
   },
   "type": "module",
   "dependencies": {
