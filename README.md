@@ -2,6 +2,10 @@
 
 Aplicación web que identifica componentes electrónicos y detecta posibles daños a partir de una fotografía.
 
+**Demo:** [ai-electronics-diagnostic.vercel.app](https://ai-electronics-diagnostic.vercel.app)
+
+> La demo funciona con la capa gratuita de Gemini y de Tavily, compartida por todos los visitantes. Puede mostrar «servicio saturado» o «cuota agotada» en momentos de mucho uso: si pasa, prueba más tarde. En este modo de pruebas, Google puede usar las fotos para mejorar sus modelos, así que no subas imágenes con datos personales. El diagnóstico es visual y orientativo: no sustituye a una comprobación con instrumentos.
+
 **Estado:** MVP completo: flujo principal (captura → preparación → análisis con IA → informe), documentación técnica con enlaces comprobados, asistente conversacional e historial local.
 
 ## Estructura
